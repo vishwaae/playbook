@@ -1,0 +1,73 @@
+- hosts: ansible-awx
+  tasks:
+    - name: Ping
+      ping:
+    - firewalld:
+        service: http
+        permanent: true
+        state: enabled
+    - firewalld:
+        service: https
+        permanent: true
+        state: enabled
+    - firewalld:
+        permanent: true
+        port: 443/tcp
+        state: disabled
+    - firewalld:
+        permanent: true
+        port: 80/tcp
+        state: disabled
+    - firewalld:
+        permanent: true
+        port: 8080/tcp
+        state: disabled
+    - name: firewall restart
+      service:
+        name: firewalld
+        state: restarted
+    - name: Disable RHN plugin
+      lineinfile:
+        dest: /etc/yum/pluginconf.d/subscription-manager.conf
+        regexp: '^enabled.*$'
+        line: 'enabled=0'
+    - name: Remove repository (and clean up left-over metadata)
+      yum_repository: name={{item}}
+      with_items:
+        - epel
+        - ius-release
+      state: absent
+    - name: Check epel and python 3.6 installed
+      yum: list={{item}}
+      with_items:
+        - epel-release-7-12.noarch
+        - ius-release-2-1.el7.ius.noarch
+      register: EPEL_INSTALLED
+    - name: Setup epel and python 3.6 yum repository
+      command: yum install -y http://repos.del.extreme-ix.org/epel/7/x86_64/Packages/e/epel-release-7-12.noarch.rpm && yum install -y https://centos7.iuscommunity.org/ius-release.rpm
+      when: EPEL_INSTALLED.results|selectattr("yumstate", "match", "installed")|list|length != 0
+    - name: Install postgresql and other packages
+      yum: name={{item}} state=installed
+      with_items:
+        - rabbitmq-server
+        - memcached
+        - nginx
+        - python36u
+        - python36u-libs
+        - python36u-devel
+        - python36u-pip
+    - name: Download awx repository
+      get_url:
+        url: https://copr.fedorainfracloud.org/coprs/mrmeee/ansible-awx/repo/epel-7/mrmeee-ansible-awx-epel-7.repo
+        dest: /etc/yum.repos.d/
+    - name: Check awx repo exists
+      command: ls *ansible*
+      register: ANSIBLE_REPO
+    - name: move the awx repo
+      command: mv /etc/yum.repos.d/*ansible* /etc/yum.repos.d/awx-rpm.repo
+      when: ANSIBLE_REPO== ""
+    - name: Install AWX
+      yum:
+        name: ansible-awx
+        state: installed
+

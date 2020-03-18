@@ -1,0 +1,88 @@
+################### Setup Begin ##########################
+
+Disk requirements:
+
+AWX is primarily resident in /opt/awx and /opt/rh/rh-python36, where it takes up around 500MB...
+It's works is done in tmp and /var/lib/awx.. but shouldn't take up much space...
+I would say that a server with 10GB of space should be more than enough to start with.. Of course this depends on
+your playbooks..
+
+Installation Steps:
+SELinux
+
+yum -y install policycoreutils-python
+semanage port -a -t http_port_t -p tcp 8050
+semanage port -a -t http_port_t -p tcp 8051
+semanage port -a -t http_port_t -p tcp 8052
+setsebool -P httpd_can_network_connect 1
+
+Repos:
+rpm -ivh http://mirrors.dotsrc.org/centos-altarch/7/extras/ppc64le/Packages/centos-release-scl-rh-2-3.el7.centos.noarch.rpm
+subscription-manager repos --enable rhel-7-server-for-power-le-rhscl-rpms --enable=rhel-7-for-power-le-optional-rpms
+
+AWX Repo
+
+For all builds:
+wget -O /etc/yum.repos.d/ansible-awx.repo https://copr.fedorainfracloud.org/coprs/mrmeee/ansible-awx/repo/epel-7/mrmeee-ansible-awx-epel-7.repo
+wget https://packages.erlang-solutions.com/erlang-solutions-1.0-1.noarch.rpm
+rpm -Uvh erlang-solutions-1.0-1.noarch.rpm
+wget https://www.rabbitmq.com/releases/rabbitmq-server/v3.6.9/rabbitmq-server-3.6.9-1.el7.noarch.rpm
+rpm --import https://www.rabbitmq.com/rabbitmq-release-signing-key.asc
+
+Install Pre-Reqs for AWX:
+yum -y install rabbitmq-server
+yum install -y erlang
+yum install -y rh-postgresql10 memcached
+
+Install Python dependecies:
+wget http://vault.centos.org/centos/7/sclo/Source/rh/rh-python36-python-3.6.2-3.el7.src.rpm
+yum install centos-release-scl-rh
+yum --enablerepo=centos-sclo-rh-testing install rh-python36-python
+
+Install AWX:
+yum install -y ansible-awx
+
+Configure Pre-Req Applications:
+scl enable rh-postgresql10 "postgresql-setup initdb" ==> Initialize DB
+systemctl enable rabbitmq-server
+systemctl start rabbitmq-server
+systemctl start rh-postgresql10-postgresql.service
+systemctl enable rh-postgresql10-postgresql.service
+systemctl enable memcached
+systemctl start memcached
+
+Create Postgres user and DB:
+scl enable rh-postgresql10 "su postgres -c \"createuser -S awx\""
+scl enable rh-postgresql10 "su postgres -c \"createdb -O awx awx\""
+
+Import Database data:
+sudo -u awx scl enable rh-postgresql10 rh-python36 "GIT_PYTHON_REFRESH=quiet awx-manage migrate"
+
+Initial configuration of AWX:
+echo "from django.contrib.auth.models import User; User.objects.create_superuser('admin', 'root@localhost', 'password')" | sudo -u awx scl enable rh-python36 rh-postgresql10 "GIT_PYTHON_REFRESH=quiet awx-manage shell"
+sudo -u awx scl enable rh-python36 rh-postgresql10 " GIT_PYTHON_REFRESH=quiet awx-manage create_preload_data"
+sudo -u awx scl enable rh-python36 rh-postgresql10 "GIT_PYTHON_REFRESH=quiet awx-manage provision_instance --hostname=$(hostname)"
+sudo -u awx scl enable rh-python36 rh-postgresql10 "GIT_PYTHON_REFRESH=quiet awx-manage register_queue --queuename=tower --hostnames=$(hostname)"
+
+Install and Configure Web Server Proxy:
+yum -y install nginx
+wget -O /etc/nginx/nginx.conf https://raw.githubusercontent.com/MrMEEE/awx-build/master/nginx.conf
+systemctl enable nginx
+systemctl start nginx
+
+Start and Enable AWX:
+for i in awx-cbreceiver.service awx-dispatcher.service awx-channels-worker.service awx-daphne.service awx-web.service awx.service; do systemctl start $i; done
+for i in awx-cbreceiver.service awx-dispatcher.service awx-channels-worker.service awx-daphne.service awx-web.service awx.service; do systemctl status $i; done
+for i in awx-cbreceiver.service awx-dispatcher.service awx-channels-worker.service awx-daphne.service awx-web.service awx.service; do systemctl enable $i; done
+
+Finally, The Installation and Configuration has been done.
+Open browser and run https://ip:8052
+
+Awx login prompt will get open. Provide default credentials
+Username:admin
+Password:password
+To change admin password run below command,
+
+sudo -u awx scl enable rh-python36 rh-postgresql10 "awx-manage changepassword admin"
+
+################### Setup End #########################

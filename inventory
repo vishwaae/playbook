@@ -1,0 +1,9 @@
+db-web ansible_host=10.128.0.3 ansible_ssh_pass=rootssh ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+ansible-awx ansible_host=10.128.0.2 ansible_ssh_pass=Ansible@db ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+# This is for testing purpose
+# This is second commit
+<<<<<<< Updated upstream
+##This is third commit
+=======
+>>>>>>> Stashed changes
+

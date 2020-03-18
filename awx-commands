@@ -1,0 +1,10 @@
+List of awx commands
+yum yum install awx
+service : restarted
+state : restarted
+yum:
+name: awx
+state: started
+
+ changes to new branch called dev
+ changes to dev

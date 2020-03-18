@@ -1,0 +1,10 @@
+    - name: Remove repository (and clean up left-over metadata)
+      yum_repository:
+        name: epel
+        state: absent
+    - name: Setup yum repository
+      yum_repository:
+        name: epel
+        description: EPEL YUM REPO
+        baseurl: http://download.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-5.noarch.rpm
+        gpgcheck: no
